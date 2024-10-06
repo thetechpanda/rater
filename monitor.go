@@ -10,9 +10,9 @@ import (
 // Value() returns the current count.
 // It resets the count every 'every' duration.
 type Monitor struct {
-	count atomic.Int64
+	count *atomic.Int64
 	// C is a channel that will receive the current count every 'every' duration, then the count will be reset.
-	C chan int64
+	C <-chan int64
 }
 
 // NewMonitor initialises and starts a monitor, once started a monitor can be stopped by cancelling the context passed in argument.
@@ -21,10 +21,10 @@ func NewMonitor(ctx context.Context, every time.Duration) *Monitor {
 	if every <= 0 {
 		every = time.Second
 	}
-	ctr := &Monitor{
-		C: make(chan int64),
-	}
+	c := make(chan int64)
+	count := atomic.Int64{}
 	go func(ctx context.Context) {
+		defer close(c)
 		ticker := time.NewTicker(every)
 		defer ticker.Stop()
 		for {
@@ -33,7 +33,7 @@ func NewMonitor(ctx context.Context, every time.Duration) *Monitor {
 				select {
 				case <-ctx.Done():
 					return
-				case ctr.C <- ctr.count.Swap(0):
+				case c <- count.Swap(0):
 				default:
 				}
 			case <-ctx.Done():
@@ -41,7 +41,10 @@ func NewMonitor(ctx context.Context, every time.Duration) *Monitor {
 			}
 		}
 	}(ctx)
-	return ctr
+	return &Monitor{
+		C:     c,
+		count: &count,
+	}
 }
 
 // Rate increments the count and returns the current count.

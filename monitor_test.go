@@ -39,3 +39,34 @@ func TestMonitorChannel(t *testing.T) {
 		t.Fatalf("got %d, want %d", got, 0)
 	}
 }
+
+func TestMonitorChannelClose(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	monitor := rater.NewMonitor(ctx, time.Second)
+	closed := false
+	go func() {
+		tout := time.NewTimer(time.Millisecond * 500)
+		for {
+			select {
+			case <-tout.C:
+				t.Error("monitor closing timeout")
+			case _, more := <-monitor.C:
+				if !more {
+					closed = true
+					return
+				}
+			}
+		}
+
+	}()
+	for i := 0; i < 10; i++ {
+		go monitor.Rate()
+	}
+	time.Sleep(time.Millisecond)
+	cancel()
+	time.Sleep(time.Millisecond * 10)
+	if !closed {
+		t.Error("monitor channel not closed")
+	}
+}

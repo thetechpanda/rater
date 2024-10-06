@@ -11,13 +11,10 @@ import (
 
 func thousand(i int64) string {
 	s := strconv.Itoa(int(i))
-
 	for i := len(s); i > 3; i -= 3 {
 		s = s[:i-3] + "," + s[i-3:]
 	}
-
 	return s
-
 }
 
 func main() {
